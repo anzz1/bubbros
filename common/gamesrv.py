@@ -502,7 +502,9 @@ class Client:
           if self.udpsockcounter < 1024:
             return
           self.force_ping_delay += 0.2
-        self.msgl.append(message(MSG_PING, self.udpsockcounter>>10))
+        # (the counter is sys.maxsize when the frames cannot be sent)
+        self.msgl.append(message(MSG_PING,
+                                 min(self.udpsockcounter>>10, 0x7FFFFFFF)))
         self.last_ping = NOW
 
   def setup_dyncompress(self):
@@ -1157,7 +1159,7 @@ class Game:
   def socketerrors(self, ewtd):
     for c in clients[:]:
       if c.socket in ewtd:
-        del ewtd[c.socket]
+        ewtd.remove(c.socket)
         c.disconnect("error", "select")
 
   def mainstep(self):
