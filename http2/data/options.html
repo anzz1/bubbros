@@ -197,12 +197,18 @@ endgroup()
 %(
 soundmodes = self.soundmodeslist()
 java = graphicmodes[0] in currentmodes
+html5 = currentmodes[0] is not None and currentmodes[0].name == 'html5'
 begingroup('Sound driver', '#800000', '#FFFF00', '#C0C0C0',
-           'lbiob.png', java and 1 or len(soundmodes))
+           'lbiob.png', (java or html5) and 1 or len(soundmodes))
 if java:
     begingroupitem(1)
     print('<td><font size=-1>Java Applet always does sounds, but', end=' ')
     print('background music is not implemented</font></td>')
+    endgroupitem()
+elif html5:
+    begingroupitem(1)
+    print('<td><font size=-1>The HTML5 client plays the sounds and the', end=' ')
+    print('music in the web browser; switch them off on its page</font></td>')
     endgroupitem()
 else:
     modeitems(soundmodes)
@@ -234,6 +240,10 @@ if java:
 
    <p>TCP game server port: <%(nameval("text", "port_LISTEN", default="", mangling=0))s><br>
       HTTP server port: <%(nameval("text", "port_HTTP", default="", mangling=0))s></p>
+
+   <p>For the HTML5 clients, if the html5 driver is installed:<br>
+      WebSocket server port (TCP): <%(nameval("text", "port_WEBSOCKET", default="", mangling=0))s><br>
+      First WebRTC port (UDP, a range of 32 ports): <%(nameval("text", "port_WEBRTC", default="", mangling=0))s></p>
 
    <p>Client incoming UDP port (or <code>host:port</code> if redirected): <%(nameval("text", "port_CLIENT", default="", mangling=0))s><br>
       <%(nameval("radio", "datachannel", "ucp", mangling=0))s>always UDP</input>

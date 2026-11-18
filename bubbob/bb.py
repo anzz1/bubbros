@@ -248,6 +248,9 @@ def parse_cmdline(argv):
         print('  --port BROADCAST=#   udp, the port on the clients where the frames are sent', file=sys.stderr)
         print('                         by broadcast on a local network (default: random', file=sys.stderr)
         print('                         in 18000-18999)', file=sys.stderr)
+        print('  --port WEBSOCKET=#   tcp, for the HTML5 clients (default: chosen by the', file=sys.stderr)
+        print('                         system; needs the html5 driver)', file=sys.stderr)
+        print('  --port WEBRTC=#      udp, for the HTML5 clients: the first of 32 ports', file=sys.stderr)
         print('                         (default: chosen by the system)', file=sys.stderr)
         print('  -h   --help          display this text', file=sys.stderr)
         #print >> sys.stderr, '  -rxxx record the game in file xxx'

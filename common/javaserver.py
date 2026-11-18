@@ -63,7 +63,7 @@ def playernames(options):
                 anyname = result[keyid]
     return result
 
-def indexloader(**options):
+def docheats(options):
     if 'cheat' in options:
         cheats = options.pop('cheat')
         # a developer's tool: off unless asked for when starting the game
@@ -73,6 +73,9 @@ def indexloader(**options):
             if fn is not None:
                 for opt in cheats:
                     fn(opt)
+
+def indexloader(**options):
+    docheats(options)
     import gamesrv
     if gamesrv.game is None:
         indexdata = EMPTY_PAGE
@@ -89,14 +92,19 @@ def indexloader(**options):
             }
     return StringIO(indexdata), 'text/html'
 
-def nameloader(**options):
-    if 's' in options:
-        return indexloader(**options)
-    locals = {
-        'options': playernames(options),
-        }
-    return httpserver.load(os.path.join(DATADIR, 'name.html'),
-                           'text/html', locals=locals)
+def makenameloader(indexloader):
+    # the 'name.html' page, that goes back to the given index page
+    def nameloader(**options):
+        if 's' in options:
+            return indexloader(**options)
+        locals = {
+            'options': playernames(options),
+            }
+        return httpserver.load(os.path.join(DATADIR, 'name.html'),
+                               'text/html', locals=locals)
+    return nameloader
+
+nameloader = makenameloader(indexloader)
 
 
 wave_cache = {}
@@ -180,9 +188,19 @@ def sampleloader(code=[], **options):
     return BytesIO(data), 'audio/wav'
 
 
-def setup():
-    # The applet and its pages are public: served to the other computers
-    # too (see httpserver.register()).
+def register_name_page(prefix, nameloader):
+    httpserver.register(prefix + 'name.html', nameloader, public=True)
+    # 'name.html' has a few images, list the .png files in DATADIR
+    for fn in os.listdir(DATADIR):
+        fn = fn.lower()
+        if fn.endswith('.png'):
+            httpserver.register(prefix + fn, httpserver.fileloader(
+                os.path.join(DATADIR, fn)), public=True)
+
+def setup(prefix=''):
+    # The applet and its pages are registered under 'prefix': '' puts
+    # the applet on the default page, 'java/' moves it to /java/.
+    # They are public: served to the other computers too.
     dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                        os.pardir,
                                        'java'))
@@ -192,23 +210,26 @@ def setup():
     # register all '.class' files
     for name in os.listdir(dir):
         if name.endswith('.class'):
-            httpserver.register(name,
+            httpserver.register(prefix + name,
                                 httpserver.fileloader(os.path.join(dir, name)),
                                 public=True)
 
     # register a '', an 'index.html', and a 'name.html' file
-    httpserver.register('', indexloader, public=True)
-    httpserver.register('index.html', indexloader, public=True)
-    httpserver.register('name.html',  nameloader, public=True)
-
-    # 'name.html' has a few images, list the .png files in DATADIR
-    for fn in os.listdir(DATADIR):
-        fn = fn.lower()
-        if fn.endswith('.png'):
-            httpserver.register(fn, httpserver.fileloader(
-                os.path.join(DATADIR, fn)), public=True)
+    httpserver.register(prefix, indexloader, public=True)
+    httpserver.register(prefix + 'index.html', indexloader, public=True)
+    register_name_page(prefix, nameloader)
 
     # register the sample loader
-    httpserver.register('sample.wav', sampleloader, public=True)
+    httpserver.register(prefix + 'sample.wav', sampleloader, public=True)
 
-setup()
+# The web client of the game is the HTML5 one if its driver is installed
+# (see html5server.py), and the Java applet moves to /java/.  Else the
+# applet stays on the default page.
+try:
+    import html5server
+except ImportError as e:
+    html5server = None
+    setup()
+else:
+    setup('java/')
+    html5server.setup()

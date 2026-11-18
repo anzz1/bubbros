@@ -117,6 +117,8 @@ def graphicmodeslist():
                     ['--zoom=xxx%         scale image by xxx %'],
                     {'zoom': '100'},
                     url='https://pygobject.gnome.org/'),
+        # the game runs in a web browser, see dpy_html5.py
+        GraphicMode('html5', 'HTML5 (in your web browser)', []),
         ]
 
 def soundmodeslist():

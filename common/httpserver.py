@@ -119,8 +119,8 @@ class HTTPRequestError(Exception):
 # The control page of the game is only for the player at this computer:
 # a web page from elsewhere, open in the same browser, could otherwise
 # send requests to it, even read the answers with DNS rebinding.  The
-# web client of the game (the Java applet) and the pages of the
-# meta-server are public.
+# web client of the game (the HTML5 client or the Java applet) and the
+# pages of the meta-server are public.
 LOCAL_HOSTS = ('127.0.0.1', 'localhost', '[::1]')
 
 def is_local_request(client_address, headers):

@@ -1,5 +1,5 @@
-"""The HTTP server of a game: the web client of the game (the Java
-applet) is for everybody, the rest (the control
+"""The HTTP server of a game: the web client of the game (the HTML5
+client or the Java applet) is for everybody, the rest (the control
 page) only for the computer the game runs on."""
 
 import http.client
@@ -138,28 +138,55 @@ class Access(SavedPages):
         self.assertEqual(self.get(url, 'game.example:8000'), 403)
 
 
-class JavaApplet(SavedPages):
+class WhichClient(SavedPages):
+    """The default page is the HTML5 client if its driver is installed,
+    and then the Java applet is at /java/; else it is the applet."""
 
-    def load_javaserver(self):
-        saved = sys.modules.pop('javaserver', None)
+    def load_javaserver(self, html5):
+        saved = {name: sys.modules.get(name)
+                 for name in ('javaserver', 'html5server')}
         def restore():
-            if saved is None:
-                sys.modules.pop('javaserver', None)
-            else:
-                sys.modules['javaserver'] = saved
+            for name, module in saved.items():
+                if module is None:
+                    sys.modules.pop(name, None)
+                else:
+                    sys.modules[name] = module
         self.addCleanup(restore)
+        sys.modules.pop('javaserver', None)
+        if not html5:
+            sys.modules['html5server'] = None   # import fails
         return importlib.import_module('javaserver')
 
-    def test_applet_is_public(self):
-        javaserver = self.load_javaserver()
+    def test_without_the_html5_driver(self):
+        javaserver = self.load_javaserver(html5=False)
+        self.assertIsNone(javaserver.html5server)
         self.assertIs(httpserver.pathloaders[''], javaserver.indexloader)
-        for path in ('', 'index.html', 'name.html', 'pclient.class',
-                     'sample.wav'):
+        self.assertIn('pclient.class', httpserver.pathloaders)
+        self.assertNotIn('java/', httpserver.pathloaders)
+        self.assertNotIn('html5/bubbros.js', httpserver.pathloaders)
+        self.assertTrue(httpserver.is_public('/'))
+        self.assertTrue(httpserver.is_public('/pclient.class'))
+
+    def test_with_the_html5_driver(self):
+        try:
+            import html5server
+        except ImportError:
+            self.skipTest("the html5 driver is not installed")
+        javaserver = self.load_javaserver(html5=True)
+        self.assertIs(httpserver.pathloaders[''], html5server.indexloader)
+        self.assertIs(httpserver.pathloaders['java/'], javaserver.indexloader)
+        for path in ('', 'index.html', 'name.html', 'html5/bubbros.js',
+                     'html5/inflate.js', 'java/', 'java/pclient.class',
+                     'java/name.html', 'java/sample.wav'):
             self.assertTrue(httpserver.is_public(path), path)
+        self.assertNotIn('pclient.class', httpserver.pathloaders)
+        # '?java' asks for the applet
+        self.assertEqual(html5server.indexloader(java=['1']),
+                         (None, 'java/'))
 
     def test_player_names_are_quoted(self):
         import gamesrv, types
-        javaserver = self.load_javaserver()
+        javaserver = self.load_javaserver(html5=False)
         saved = gamesrv.game
         self.addCleanup(setattr, gamesrv, 'game', saved)
         gamesrv.game = types.SimpleNamespace(FnDesc='Bub & Bob', width=1,
