@@ -238,6 +238,7 @@ var dynNoRepeat = null;
 
 // sounds
 var audio = null;
+var aout = null;
 var soundEnabled = true, musicEnabled = true;
 var sounds = {};            // {sample code: AudioBuffer}
 var playingsounds = {};
@@ -636,9 +637,37 @@ function initAudio() {
             if (music && !music.track)
                 startTrack();
         };
+        aout = makeAudioOut();
     } catch (e) {
         audio = null;
     }
+}
+
+var CLIP_KNEE = 0.5;        // below this, unchanged
+var CLIP_RANGE = 4;         // the input the curve covers, -4..4
+
+function softClip(x) {
+    var a = Math.abs(x);
+    if (a <= CLIP_KNEE)
+        return x;
+    var y = CLIP_KNEE + (1 - CLIP_KNEE) * Math.tanh((a - CLIP_KNEE) /
+                                                    (1 - CLIP_KNEE));
+    return x < 0 ? -y : y;
+}
+
+function makeAudioOut() {
+    // a WaveShaper maps -1..1 to its curve: scale the input down first
+    var input = audio.createGain();
+    input.gain.value = 1 / CLIP_RANGE;
+    var shaper = audio.createWaveShaper();
+    var n = 4097, curve = new Float32Array(n);
+    for (var i = 0; i < n; i++)
+        curve[i] = softClip((2 * i / (n - 1) - 1) * CLIP_RANGE);
+    shaper.curve = curve;
+    shaper.oversample = '4x';
+    input.connect(shaper);
+    shaper.connect(audio.destination);
+    return input;
 }
 
 function logAudio() {
@@ -680,7 +709,7 @@ function playSound(buffer, lvolume, rvolume) {
     source.connect(right);
     left.connect(merger, 0, 0);
     right.connect(merger, 0, 1);
-    merger.connect(audio.destination);
+    merger.connect(aout);
     source.start();
 }
 
@@ -870,7 +899,7 @@ function playMusics(loopFrom, codes) {
     music = {loopFrom: loopFrom, codes: codes, index: 0, track: null,
              gain: audio.createGain()};
     music.gain.gain.value = MUSIC_VOLUME;
-    music.gain.connect(audio.destination);
+    music.gain.connect(aout);
     startTrack();
 }
 
