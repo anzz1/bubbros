@@ -443,6 +443,7 @@ class Client:
     self.musiclist = [0]
     self.proto = 1
     self.dyncompress = None
+    self.udp_token = None
     addsocket('CLIENT', self.transport, self.input_handler)
     clients.append(self)
     self.log('connected')
@@ -649,6 +650,7 @@ then use the following address:
     except KeyError:
       pass
     clients.remove(self)
+    udp_tokens.pop(self.udp_token, None)
     self.sendframe = None
     try:
       self.transport.close()
@@ -793,6 +795,14 @@ then use the following address:
 
   def protocol_version(self, version, *rest):
     self.proto = version
+    endpoint = getattr(self.transport, 'endpoint', None)
+    if version >= 4 and endpoint is not None and self.udp_token is None:
+      # the client sends this token to our UDP port, and we learn from
+      # where: its NAT lets in the frames from there (see udp_datagram)
+      self.udp_token = os.urandom(4)
+      udp_tokens[self.udp_token] = self
+      self.msgl.append(message(MSG_UDP_TOKEN, endpoint.getsockname()[1],
+                               self.udp_token))
 
   def md5_data_request(self, fileid, position, size, *rest):
     data = filereaders[fileid]((position, size))
@@ -864,6 +874,41 @@ recording = None
 game = None
 sounds_muted = 0
 serversockets = {}
+udp_tokens = {}         # {token: Client}
+
+def udp_datagram(data, addr):
+  """A datagram on the game's UDP port."""
+  if data == b'.':
+    # an older client opens its NAT: if it is the only client from this
+    # address, its datagrams come from 'addr'
+    found = [c for c in clients
+             if c.udp_token is None and c.transport is not None
+             and getattr(c.transport, 'endpoint', None) is not None
+             and c.transport.getpeername()[0] == addr[0]]
+    if len(found) == 1:
+      udp_learn(found[0], addr)
+  elif data[:1] == b'.':
+    for values in decodedatagram(data):
+      fn = UDP_MESSAGES.get(values[0])
+      if fn is not None:
+        fn(addr, *values[1:])
+  # anything else: reserved
+
+def udp_learn(c, addr):
+  # the client's datagrams come from 'addr', where its NAT lets in the
+  # replies: send its frames there
+  if c.transport is not None and c.transport.learned_udppeer != addr:
+    c.log('udp from %s:%d' % addr)
+    c.transport.learn_udp_peer(addr)
+
+def udp_token(addr, token, *rest):
+  c = udp_tokens.get(token)
+  if c is not None:
+    udp_learn(c, addr)
+
+UDP_MESSAGES = {
+  DMSG_TOKEN: udp_token,
+  }
 socketsbyrole = {}
 socketports   = {}
 
@@ -1022,7 +1067,7 @@ def opentcpsocket(port=None):
       def udpsocket_handler(u=u):
         try:
           for data, addr in u.datagrams():
-            pass    # the clients' first datagram, to open their NAT
+            udp_datagram(data, addr)
         except error as e:
           print("UDP socket error:", e, file=sys.stderr)
           removesocket('UDP', u)
