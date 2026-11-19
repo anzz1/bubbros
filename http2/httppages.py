@@ -37,6 +37,9 @@ class Options:
             raise AttributeError(attr)
 
 
+# the display drivers that are a page of the server, not Client.py
+WEB_CLIENTS = ('java', 'html5')
+
 HOST_RE = re.compile(r'[A-Za-z0-9.-]+$|\[[0-9A-Fa-f:.]+\]$')
 
 
@@ -397,15 +400,17 @@ class PageServer:
             except ValueError:
                 raise HTTPRequestError("Bad port number.")
         if args is None:
-            # redirect to the Java applet
+            # redirect to the web client of the server: the HTML5 client
+            # or the Java applet
             try:
                 httpport = int(httpport[0])
             except (ValueError, IndexError):
                 if port:
                     raise HTTPRequestError("This server is not running HTTP.")
                 else:
-                    raise HTTPRequestError("Sorry, I cannot connect the Java applet to a server using this field.")
-            return None, 'http://%s:%s/' % (host, httpport)
+                    raise HTTPRequestError("Sorry, I cannot connect the web client to a server using this field.")
+            return None, 'http://%s:%s/%s' % (host, httpport,
+                                              self.webclientquery())
 
         if port:
             address = '%s:%s' % (host, port)
@@ -439,6 +444,8 @@ class PageServer:
             self.localoptions.port_CLIENT = None
             self.localoptions.port_LISTEN = None
             self.localoptions.port_HTTP = None
+            self.localoptions.port_WEBSOCKET = None
+            self.localoptions.port_WEBRTC = None
             for key, value in list(options.items()):
                 setattr(self.localoptions, key, value[0])
             self.saveoptions()
@@ -499,6 +506,11 @@ class PageServer:
             javamode.low_priority = 1
             javamode.getmodule = lambda : None
             self.GraphicModesList.insert(0, javamode)
+            html5mode = display.modes.GraphicMode(
+                'html5', 'HTML5 (in your web browser)', [])
+            html5mode.low_priority = 1
+            html5mode.getmodule = lambda : __import__('html5server')
+            self.GraphicModesList.insert(1, html5mode)
             return self.GraphicModesList
 
     def soundmodeslist(self):
@@ -526,10 +538,20 @@ class PageServer:
             currentmodes.append(mode)
         return currentmodes
 
+    def webclientquery(self):
+        # The page of a server is its web client, the HTML5 one or the
+        # Java applet, as the server has it.  The player names go along.
+        query = []
+        for key, value in sorted(self.localoptions.dict().items()):
+            if (key.startswith('player') and key[6:].isdigit()
+                    and isinstance(value, str) and value):
+                query.append('%s=%s' % (key, quote_plus(value)))
+        return query and '?' + '&'.join(query) or ''
+
     def buildclientoptions(self):
         dpy, snd = self.localmodes()
-        if dpy.getmodule() is None:
-            return None  # redirect to the Java applet
+        if dpy is not None and dpy.name in WEB_CLIENTS:
+            return None  # redirect to the page of the server
         if dpy is None or snd is None:
             raise HTTPRequestError("No installed graphics or sounds drivers. See the settings page.")
         options = self.localoptions

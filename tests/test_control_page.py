@@ -197,5 +197,67 @@ class TempFiles(unittest.TestCase):
                         .startswith('bub-n-bros-'))
 
 
+class WebClients(unittest.TestCase):
+    """The display drivers that are a page of the game server: joining
+    redirects the browser there instead of starting Client.py."""
+
+    def join(self, driver, options={}, **kwds):
+        class Pages(FakePages):
+            def localmodes(self):
+                return (FakeMode(driver, {}), FakeMode('off', {}))
+            def webclientquery(self):
+                return httppages.PageServer.webclientquery(self)
+        self.addCleanup(setattr, httppages, 'schedule_launch',
+                        httppages.schedule_launch)
+        httppages.schedule_launch = self.fail
+        return httppages.PageServer.joinloader(
+            Pages(options), {}, host=['example.org'], port=['1234'], **kwds)
+
+    def test_html5(self):
+        f, url = self.join('html5', httpport=['8000'])
+        self.assertIsNone(f)
+        self.assertEqual(url, 'http://example.org:8000/')
+
+    def test_both_open_the_page_of_the_server(self):
+        # the server chooses its web client: the same page for both, with
+        # the player names
+        for driver in ('html5', 'java'):
+            f, url = self.join(driver, {'player0': 'Bub'}, httpport=['8000'])
+            self.assertEqual(url, 'http://example.org:8000/?player0=Bub',
+                             driver)
+
+    def test_player_names_go_along(self):
+        f, url = self.join('html5', {'player0': 'Bub & Co', 'player3': 'x',
+                                     'playerx': 'no', 'port_HTTP': '1'},
+                           httpport=['8000'])
+        self.assertEqual(url, 'http://example.org:8000/'
+                              '?player0=Bub+%26+Co&player3=x')
+
+    def test_server_without_http(self):
+        self.assertRaises(HTTPRequestError, self.join, 'html5')
+
+    def test_web_clients(self):
+        # listed with the display drivers, not drivers of Client.py;
+        # html5 is installed with its packages (as the server serves it)
+        class Pages:
+            pass
+        modes = httppages.PageServer.graphicmodeslist(Pages())
+        web = dict((m.name, m) for m in modes if m.low_priority)
+        self.assertEqual(sorted(web), ['html5', 'java'])
+        self.assertFalse(web['java'].imperror())
+        try:
+            import picows, aiolibdatachannel
+        except ImportError:
+            self.assertEqual(web['html5'].imperror(), 'not installed')
+        else:
+            self.assertFalse(web['html5'].imperror())
+        import display.modes
+        self.assertEqual([m for m in display.modes.graphicmodeslist()
+                          if m.name in web], [])
+        # when no driver of Client.py is installed: the applet
+        self.assertEqual(display.modes.findmode(None, list(web.values()))
+                         .name, 'java')
+
+
 if __name__ == '__main__':
     unittest.main()
