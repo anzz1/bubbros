@@ -131,6 +131,8 @@ def graphicmodeslist():
                      '--shm=no   disable it (for remote connections or old X servers)',
                      ],
                     {'shm': 'yes'}),
+        # the game runs in a web browser, see dpy_html5.py
+        GraphicMode('html5', 'HTML5 (in your web browser)', []),
         ]
 
 def soundmodeslist():

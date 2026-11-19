@@ -1,0 +1,38 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    background: #000000;
+    color: #C0C0C0;
+    font-family: sans-serif;
+    text-align: center;
+}
+
+#playfield {
+    display: block;
+    margin: 8px auto 0 auto;
+    background: #000000;
+    outline: none;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+#status {
+    margin: 6px 0 0 0;
+    min-height: 1.2em;
+    color: #FFC000;
+}
+
+#help {
+    margin: 2px 0;
+    font-size: 80%;
+}
+
+#links {
+    margin: 2px 0;
+    font-size: 80%;
+}
+
+#links a {
+    color: #80C0FF;
+    margin: 0 8px;
+}

@@ -182,6 +182,12 @@ def metalist():
 
 def main():
     (s, sockaddr), mode = parse_cmdline(sys.argv[1:])
+    if (mode[0] or '').lower() == 'html5':
+        # this client is in the web browser, not in this program
+        ginfo = modes.findmode_err(mode[0], modes.graphicmodeslist())
+        s.close()
+        ginfo.getmodule().run(sockaddr)
+        return
     pclient.run(s, sockaddr, mode)
 
 if __name__ == '__main__':
