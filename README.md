@@ -40,6 +40,10 @@ Optional:
 - OSS sound (`-s linux`) or Windows native sound (`-s windows`): the
   `audioop` module. Python 3.13 removed it from the standard library;
   install `python3-audioop-lts` (Debian) or `pip install audioop-lts`.
+- HTML5 client, to play in a web browser (`html5` driver): Python 3.12 or
+  later and the packages `picows` and `aiolibdatachannel` (picows requires >=
+  3.9, aiolibdatachannel >= 3.12). `make html5`, or
+  `pip install ./html5`, installs them. See "Playing in a web browser".
 
 ## How to play
 
@@ -58,6 +62,38 @@ The server prints the PORT it listens on.
 
 `python3 bubbob/bb.py --help` and `python3 display/Client.py --help` list
 the options.
+
+## Playing in a web browser
+
+Every game server has a web page, on its HTTP port, with a client that
+needs no installation: `http://HOST:HTTPPORT/` (the server prints the
+address when it starts).
+
+- With the `html5` driver installed on the server, that page is the HTML5
+  client, and the old Java applet is at `/java/`.
+- Without it, the page is the Java applet, as before. No current browser
+  runs applets.
+
+A browser cannot open TCP or UDP sockets, so the HTML5 client uses a
+WebSocket instead of TCP and a WebRTC data channel instead of UDP. If the
+data channel cannot be opened, everything goes over the WebSocket, like
+the `--tcp` option of the Python client. The other clients are not
+affected: they use plain sockets as before, and the game protocol is the
+same for all of them (see `common/transport.py`).
+
+Ports to open on the server for players on other computers: the HTTP
+port (TCP), the WebSocket port (TCP) and the WebRTC ports (UDP). They are
+chosen by the system unless you fix them, on the Options page or with
+
+    python3 bubbob/bb.py --port HTTP=8000 --port WEBSOCKET=8001 \
+        --port WEBRTC=8100 bubbob/levels/Levels.bin
+
+`WEBRTC=8100` means the 32 UDP ports from 8100, one per client. For a
+server behind a NAT, name STUN or TURN servers in
+`BUBBROS_ICE_SERVERS=stun:stun.example.org:3478,...`.
+
+Only the game's web client is served to other computers. The control
+page of `BubBob.py` answers only to the computer it runs on.
 
 ## Internet games
 

@@ -197,5 +197,56 @@ class TempFiles(unittest.TestCase):
                         .startswith('bub-n-bros-'))
 
 
+class WebClients(unittest.TestCase):
+    """The display drivers that are a page of the game server: joining
+    redirects the browser there instead of starting Client.py."""
+
+    def join(self, driver, options={}, **kwds):
+        class Pages(FakePages):
+            def localmodes(self):
+                return (FakeMode(driver, {}), FakeMode('off', {}))
+            def webclientquery(self):
+                return httppages.PageServer.webclientquery(self)
+        self.addCleanup(setattr, httppages, 'schedule_launch',
+                        httppages.schedule_launch)
+        httppages.schedule_launch = self.fail
+        return httppages.PageServer.joinloader(
+            Pages(options), {}, host=['example.org'], port=['1234'], **kwds)
+
+    def test_html5(self):
+        f, url = self.join('html5', httpport=['8000'])
+        self.assertIsNone(f)
+        self.assertEqual(url, 'http://example.org:8000/')
+
+    def test_java_asks_for_the_applet(self):
+        # a server with the HTML5 client has the applet at /java/, and
+        # redirects there; a server without it ignores the option
+        f, url = self.join('java', httpport=['8000'])
+        self.assertEqual(url, 'http://example.org:8000/?java=1')
+
+    def test_player_names_go_along(self):
+        f, url = self.join('html5', {'player0': 'Bub & Co', 'player3': 'x',
+                                     'playerx': 'no', 'port_HTTP': '1'},
+                           httpport=['8000'])
+        self.assertEqual(url, 'http://example.org:8000/'
+                              '?player0=Bub+%26+Co&player3=x')
+
+    def test_server_without_http(self):
+        self.assertRaises(HTTPRequestError, self.join, 'html5')
+
+    def test_html5_is_a_display_driver(self):
+        # listed with the others, as not installed without its packages
+        import display.modes
+        modes = [m for m in display.modes.graphicmodeslist()
+                 if m.name == 'html5']
+        self.assertEqual(len(modes), 1)
+        try:
+            import picows, aiolibdatachannel
+        except ImportError:
+            self.assertEqual(modes[0].imperror(), 'not installed')
+        else:
+            self.assertFalse(modes[0].imperror())
+
+
 if __name__ == '__main__':
     unittest.main()

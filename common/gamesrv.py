@@ -1080,6 +1080,33 @@ def opentcpsocket(port=None):
       addsocket('UDP', u, udpsocket_handler)
   return s
 
+def openwebsocket(port=None):
+  # The HTML5 clients connect here, with WebSockets and WebRTC instead
+  # of TCP and UDP.  This needs the html5 driver (see html5server.py);
+  # without it, there is just no such port.
+  port = port or PORTS.get('WEBSOCKET', None)
+  s = findsocket('WEBSOCKET')
+  if s is None:
+    try:
+      import html5server
+    except ImportError:
+      return None
+    try:
+      s = html5server.Hub(port)
+    except error as e:
+      print(str(e), file=sys.stderr)
+      return None
+
+    def websocket_handler(s=s):
+      for transport in s.accept():
+        if game is None:
+          transport.close()
+        else:
+          game.newclient(transport, transport.getpeername())
+
+    addsocket('WEBSOCKET', s, websocket_handler)
+  return s
+
 def openpingsocket(only_port=None):
   only_port = only_port or PORTS.get('PING', None)
   s = findsocket('PING')
@@ -1117,8 +1144,8 @@ def openhttpsocket(ServerClass=None, HandlerClass=None,
       import javaserver
       from httpserver import MiniHandler as HandlerClass
     # The server listens on all interfaces: the web client of the game
-    # (the Java applet) is for everybody.  The control page is not: see
-    # httpserver.register().
+    # (the HTML5 client or the Java applet) is for everybody.  The
+    # control page is not: see httpserver.register().
     server_address = ('', port or 8000)
     try:
       httpd = ServerClass(server_address, HandlerClass)
@@ -1179,6 +1206,7 @@ class Game:
     global game
     s = opentcpsocket()
     self.address = HOSTNAME, socketports[s]
+    openwebsocket()
     bs = self.broadcast_s = openbroadcastsocket()
     self.broadcast_port = socketports.get(bs)
     self.broadcast_next = None
@@ -1200,6 +1228,9 @@ class Game:
     if hs:
       print('HTTP server: http://%s:%d' % (
         self.address[0], displaysockport(hs)))
+    ws = findsocket('WEBSOCKET')
+    if ws:
+      print('HTML5 clients: WebSocket port %d' % displaysockport(ws))
 
     try:
       from localmsg import autonotify
@@ -1397,6 +1428,7 @@ def mainloop():
       u.close()
     removesocket('UDP')
     removesocket('LISTEN')
+    removesocket('WEBSOCKET')
     removesocket('PING')
     if interrupted:
       # Ctrl-C: stop now, the clients see that the server is gone

@@ -24,6 +24,13 @@ all:
 	@echo ' '
 	@echo -------------------------------------------------------------
 
+# The optional html5 driver: the game in a web browser.  It installs
+# the packages picows and aiolibdatachannel (see html5/setup.py).
+html5:
+	$(PYTHON) -m pip install ./html5
+
+.PHONY: html5
+
 clean:
 	-rm -f `find -name "*~"`
 	-rm -f `find -name "*.py[co]"`
