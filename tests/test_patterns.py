@@ -29,6 +29,28 @@ class GlobalPatmap(unittest.TestCase):
             self.assertFalse(images.haspat((n, 'r')))
 
 
+class Reload(unittest.TestCase):
+
+    def test_reloaded_modules_keep_the_bitmaps(self):
+        # each game reloads the game modules, and so empties their caches
+        # (boards.loadmodules()): the bitmaps they make again from the
+        # same data are the same ones, not more for every joining client
+        import gamesrv
+        cwd = os.getcwd()
+        self.addCleanup(os.chdir, cwd)
+        os.chdir(os.path.join(ROOT, 'bubbob'))
+        wall = gamesrv.getbitmap(os.path.join('images', 'keys.ppm'))
+        first = images.makebkgndpattern(wall, (0, 0, 16, 16))
+        count = len(gamesrv.bitmaps)
+        self.addCleanup(sys.modules.__setitem__, 'images', images)
+        del sys.modules['images']
+        import images as reloaded
+        self.assertIsNot(reloaded, images)
+        self.assertEqual(reloaded.makebkgndpattern(wall, (0, 0, 16, 16)),
+                         first)
+        self.assertEqual(len(gamesrv.bitmaps), count)
+
+
 class LevelPatmap(unittest.TestCase):
     "A level's own 'patmap' (see levels/PatternDemo/PatternDemo.py)."
 

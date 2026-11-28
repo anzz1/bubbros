@@ -882,6 +882,7 @@ FnClient = SimpleClient
 broadcast_clients = {}
 filereaders = {}
 bitmaps = {}
+memorybitmaps = {}   # {(data, colorkey): MemoryBitmap}
 samples = {}
 music_by_id = {}
 currentmusics = [0]
@@ -1000,9 +1001,11 @@ def getmusic(filename, filerate=44100):
     return mus
 
 def newbitmap(data, colorkey=None):
-  bmp = MemoryBitmap(len(bitmaps), data, colorkey)
-  bitmaps[bmp] = bmp
-  return bmp
+  key = data, colorkey
+  if key not in memorybitmaps:
+    bmp = MemoryBitmap(len(bitmaps), data, colorkey)
+    bitmaps[bmp] = memorybitmaps[key] = bmp
+  return memorybitmaps[key]
 
 
 def addsocket(role, socket, handler=None, port=None):
